@@ -1,21 +1,22 @@
 #include <ESP8266WiFi.h>
 #include <BlynkSimpleEsp8266.h>
 #define BLYNK_PRINT Serial
-BlynkTimer timer;
 #include <SoftwareSerial.h>
-SoftwareSerial myS(13,15); //(D8,D7) / rx/tx
+SoftwareSerial myS(13,15); // (D8,D7) = rx/tx pin on nodemcu
+BlynkTimer timer;
 
-char auth[] = "-";
-char ssid[] = "-";
-char pass[] = "-";
+char auth[] = "insert your auth code";
+char ssid[] = "your wifi";
+char pass[] = "your wifi password";
 
-long milisec = millis(); // calculate time in milliseconds
-long masa = milisec/1000; // convert milliseconds to seconds
+//long milisec = millis(); // calculate time in milliseconds
+long masa = millis()/1000; // convert milliseconds to seconds
 
-  double watts;
-  double volts;
-  double amps;
-  double totalEnergy;
+float watts;
+float volts;
+float amps;
+float totalEnergy;
+float energyhour;
   
 void setup() 
 {
@@ -23,7 +24,8 @@ void setup()
   myS.begin(9600);
   Blynk.begin(auth, ssid, pass);
   Blynk.notify("Device started! Start to collecting data!");
-  //timer.setInterval(1000L, DataReceive);
+  timer.setInterval(5000, SerialEvent); // 5 saat sekali
+  timer.setInterval(300000, notifyUsage); //900k = 15min notify energy usage
 }
 
 void SerialEvent()
@@ -35,16 +37,22 @@ void SerialEvent()
        {
         volts = myS.parseFloat();
         amps = myS.parseFloat();
-        watts= myS.parseFloat();
+        watts = myS.parseFloat();
+        totalEnergy = (watts*masa)/(3600);
        }
   }
   DataReceive();
+  yield();
 } 
 
 void DataReceive()
-{    
-    //totalEnergy =totalEnergy + (watts*masa)/3600; //reading Watt-hour
-    totalEnergy = totalEnergy +(watts*masa)/(1000*3600);//reading kWh
+{   
+    
+    //totalEnergy[count] = (watts*masa)/3600; //reading Watt-hour
+    //totalEnergy = (watts*masaskrg)/(1000*3600);//reading kWh
+    energyhour = energyhour + totalEnergy;
+    Serial.print("Uptime: ");
+    Serial.println(masa++);
     
     Serial.print("Volt: ");
     Serial.println(volts,3);
@@ -59,15 +67,20 @@ void DataReceive()
     Blynk.virtualWrite(V7,watts);
     
     Serial.print("Energy: ");
-    Serial.println(totalEnergy,3);
-    Blynk.virtualWrite(V8,totalEnergy);
+    Serial.println(energyhour,3);
+    Blynk.virtualWrite(V8,energyhour);
     Serial.println(" ");
-    delay(1000);
+    yield();
+}
+
+void notifyUsage()
+{
+  Blynk.notify(("The amount of energy usage: ") + String(energyhour) + " Wh");  
 }
 
 void loop() 
 {
-  SerialEvent();
+  //SerialEvent();
   Blynk.run();
   timer.run();
 }
